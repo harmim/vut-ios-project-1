@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # debugging
 set -u # undefined variables error
@@ -15,6 +15,10 @@ do
 	case "$option" in
 	i)
 		REGEXP="$OPTARG"
+		if echo '/' | grep -qE "$REGEXP"; then
+			echo "$0: FILE_ERE must not cover name of root directory." >&2
+			exit 1
+		fi
 		;;
 	n)
 		NORMALIZATION=1
@@ -39,4 +43,4 @@ if [ $# -eq 1 ]; then
 	DIR="$1"
 fi
 
-echo "$NORMALIZATION $REGEXP $DIR"
+echo "Root directory: $DIR"
