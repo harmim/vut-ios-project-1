@@ -1,0 +1,42 @@
+#!/bin/bash
+
+# debugging
+set -u # undefined variables error
+
+POSIXLY_CORRECT=yes
+USAGE_STRING=`printf "usage:\n\t$0 [-i FILE_ERE] [-n] [DIR]"`
+NORMALIZATION=0
+REGEXP=''
+DIR=.
+
+# process options
+while getopts i:n option
+do
+	case "$option" in
+	i)
+		REGEXP="$OPTARG"
+		;;
+	n)
+		NORMALIZATION=1
+		;;
+	*)
+		echo "$USAGE_STRING" >&2
+		exit 1
+		;;
+        esac
+done
+
+# shift arguments
+OPTIND=`expr $OPTIND - 1`
+shift $OPTIND
+
+if [ $# -gt 1 ]; then
+	echo "$USAGE_STRING" >&2
+	exit 1
+fi
+
+if [ $# -eq 1 ]; then
+	DIR="$1"
+fi
+
+echo "$NORMALIZATION $REGEXP $DIR"
