@@ -3,22 +3,41 @@
 # debugging
 set -u # undefined variables error
 
+# initialization
 POSIXLY_CORRECT=yes
 USAGE_STRING=`printf "usage:\n\t$0 [-i FILE_ERE] [-n] [DIR]"`
 NORMALIZATION=0
 REGEXP=''
-DIR=.
+DIR=`pwd`
+ND=0
+NF=0
+FSH=''
 
-# process options
+# less|equalgreater:size:count:value:unit:less|equalgreater_char
+function init_fsh
+{
+	FSH=`printf "%s%s:%s:%s:%s:%s:%s;" "$FSH" "$@"`
+}
+
+init_fsh '-lt' 100 0 1 'B' '<' # < 100 B
+init_fsh '-lt' 1024 0 1 'KiB' '<' # < 1 KiB
+init_fsh '-lt' 10240 0 10 'KiB' '<' # < 10 KiB
+init_fsh '-lt' 102400 0 100 'KiB' '<' # < 100 KiB
+init_fsh '-lt' 1048576 0 1 'MiB' '<' # < 1 MiB
+init_fsh '-lt' 10485760 0 10 'MiB' '<' # < 10 MiB
+init_fsh '-lt' 104857600 0 100 'MiB' '<' # < 100 MiB
+init_fsh '-lt' 1073741824 0 1 'GiB' '<' # < 1 GiB
+init_fsh '-ge' 1073741824 0 1 'GiB' '>=' # >= 1 GiB
+
+echo "$FSH"
+
+########## process options
+
 while getopts i:n option
 do
 	case "$option" in
 	i)
 		REGEXP="$OPTARG"
-		if echo '/' | grep -qE "$REGEXP"; then
-			echo "$0: FILE_ERE must not cover name of root directory." >&2
-			exit 1
-		fi
 		;;
 	n)
 		NORMALIZATION=1
@@ -34,13 +53,71 @@ done
 OPTIND=`expr $OPTIND - 1`
 shift $OPTIND
 
+# there are too many arguments
 if [ $# -gt 1 ]; then
 	echo "$USAGE_STRING" >&2
 	exit 1
 fi
 
+# set DIR param
 if [ $# -eq 1 ]; then
 	DIR="$1"
 fi
 
+# check if FILE_ERE cover root dir
+if [ "$REGEXP" ]; then
+	if echo "$DIR" | grep -qE "$REGEXP"; then
+		echo "$0: FILE_ERE must not cover name of root directory." >&2
+		exit 1
+	fi
+fi
+
+##########
+
+########## process files
+
+dir_length=`echo "$DIR" | wc -m | awk '{$1=$1};1'`
+dir_length_dots=`eval printf '.%.0s' {1..$dir_length}`
+
+while read file; do
+	ignore=0
+
+	if [ "$REGEXP" ]; then
+		sed_arg="s/$dir_length_dots\(.*\)/\1/"
+		relative_file_name=`echo "$file" | sed "$sed_arg"`
+		if [ "$file" != "$relative_file_name" ]; then
+			IFS='/'
+			for part in $relative_file_name; do
+				unset IFS
+				if echo "$part" | grep -qE "$REGEXP"; then
+					ignore=1			
+				fi
+			done
+			unset IFS
+
+			if [ $ignore -eq 1 ]; then
+				continue
+			fi
+		fi
+	fi
+
+	if [ -d "$file" ]; then
+		ND=`expr $ND + 1`
+	else
+		NF=`expr $NF + 1`
+	fi
+done <<__END__
+`find "$DIR" -type f -or -type d`
+__END__
+
+##########
+
+########## output
+
 echo "Root directory: $DIR"
+echo "Directories: $ND"
+echo "All files: $NF"
+echo "File size histogram:"
+echo "File type histogram:"
+
+##########
