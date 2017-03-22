@@ -9,7 +9,8 @@ set -u # undefined variables error
 ########## inicialize ##########
 
 POSIXLY_CORRECT=yes
-export LC_CTYPE=C
+LC_CTYPE=C
+IFS=' '
 USAGE_STRING=$(printf "usage:\n\t$0 [-i FILE_ERE] [-n] [DIR]")
 NORMALIZATION=0
 REGEXP=''
@@ -103,12 +104,12 @@ do
 			IFS='/'
 			for part in $relative_file_name
 			do
-				unset IFS
+				IFS=' '
 				if printf "$part" | grep -qE "$REGEXP"; then
 					ignore=1			
 				fi
 			done
-			unset IFS
+			IFS=' '
 
 			if [ "$ignore" -eq 1 ]; then
 				continue
@@ -187,10 +188,10 @@ function normalization
 			keys=$(eval echo \"\${!$1[*]}\")
 			for type in $keys
 			do
-				unset IFS
+				IFS=' '
 				eval $1["$type"]=$(( $1["$type"] * 100 / max_count * max_hashes / 100 ))
 			done
-			unset IFS
+			IFS=' '
 		fi
 	fi
 }
