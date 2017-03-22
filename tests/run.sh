@@ -20,6 +20,8 @@ printf \\n%s\\n\\n "Chybovy vystup programu je ulozen do souboru:
 file='../dirgraph'
 
 
+# create empty dirs which can not be in git
+mkdir -p "test_data/empty" "test_data/hardcore/praz dny" "test_data/hardcore/e m p t y" "test_data/hardcore/e m p t y/e m p t y"
 
 # Output settings
 TEXT_BOLD=`tput bold`
