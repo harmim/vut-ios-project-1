@@ -1,27 +1,35 @@
 #!/usr/bin/env bash
 
+START=$(date +%s)
+
 help() {
-printf \\n%s\\n "## Spusteni"
-printf \\n%s "Pokud se nejedna o uklid, kazde spusteni testu vyvola preklad zdrojoveho
-kodu projektu a spusteni zakladnich testu."
-printf \\n%s "Spusteni testu:
-	bash ./test.sh"
-printf \\n%s "Uklid souboru vytvorenych v prubehu testovani:
-	bash ./test.sh -c"
-printf \\n\\n%s\\n "## Obsah souboru"
-printf \\n%s "Ocekavany vystup testu je pripraven v souboru:
-	test{cislo testu}-out"
-printf \\n%s "Vystup programu je ulozen do souboru:
-	test{cislo testu}-my"
-printf \\n%s\\n\\n "Chybovy vystup programu je ulozen do souboru:
-	test{cislo testu}-error"
+printf \\n%s\\n "Spusteni testu:
+	$0		Spusti skript dirgraph pomoci shellu bash
+	$0 dash		Spusti skript dirgraph pomoci shellu dash
+	$0 ksh		Spusti skript dirgraph pomoci shellu ksh
+	$0 sh		Spusti skript dirgraph pomoci shellu sh
+	$0 xxx		dtto, pokud xxx neexistuje vypise chybu a help
+
+	$0 -h		Vypise tento help
+	$0 -c		Uklid souboru vytvorenych v prubehu testovani
+				maze soubory *-my a *-error	
+Jak to funguje:
+	Pro kazde JMENO testu (pouzivaji se cisla) vytvori nazvy souboru:
+		testJMENO-out
+		testJMENO-my
+		testJMENO-error
+
+	testJMENO-out existuje => skript ma vracet 0 a nove vytvoreny soubor
+		testJMENO-my ma byt identicky
+	testJMENO-out neexistuje => skript ma vracet nenulovou hodnotu a 
+		zapsat neco na stderr, ktere se uklada do testJMENO-error"
 }
 
 file='../dirgraph'
 
-
 # create empty dirs which can not be in git
 mkdir -p "test_data/empty" "test_data/hardcore/praz dny" "test_data/hardcore/e m p t y" "test_data/hardcore/e m p t y/e m p t y"
+
 
 # Output settings
 TEXT_BOLD=`tput bold`
@@ -73,7 +81,7 @@ function isOk () {
     if [ -e ${testOut} ] 
     then
     
-        `diff -q ${testOut} ${testMy} > /dev/null`
+        `$diff -q ${testOut} ${testMy} > /dev/null`
         local diffResult=$?
         printf %s "isOK   ExitCode: "
         [ $testExit -eq 0 ] && green $testExit || red $testExit
@@ -91,7 +99,7 @@ function isOk () {
         err=1
         [ $testExit != 0 ] && [ -s $testError ] && err=0 # True, if <FILE> exists and has size bigger than 0 (not empty).
 
-	[ $err -eq 0 ] && printf "$TEXT_BROWN" && cat $testError
+	[ $err -eq 0 ] && printf "$TEXT_BROWN" && /bin/cat $testError
     fi
 
     [ $err -eq 0 ] && green "ok" || red "fail"
@@ -128,15 +136,15 @@ file_exists() {
 # Cleaning
 if [ "$1" == "-h" ]
 then
-    help
-    exit 0
+	help
+	exit 0
 fi
 
 # Cleaning
 if [ "$1" == "-c" ]
 then
-    ls | grep 'test.\+\-\(my\|error\)$' | xargs -d "\n" rm
-    exit 0
+	ls | grep 'test.\+\-\(my\|error\)$' | xargs -d "\n" rm
+	exit 0
 fi
 
 if [ "$#" -eq 1 ]
@@ -146,9 +154,17 @@ else
 	spoustec=bash
 fi
 
+spoustec=$(which $spoustec)
+if [ $? -ne 0 ]
+then
+	printf "${TEXT_RED}Spatny parametr ${1}.${TEXT_RESET}\n"
+	help
+	exit 1
+fi
+
+diff=$(which diff)
+
 file_exists "$file"
-
-
 
 printf %s\\n "Zakladni testy funkcnosti (spousteno pomoci $spoustec)"
 
@@ -217,5 +233,60 @@ test 20 "-i ^test_data$ ./test_data/hardcore"
 info="Cely adresar /test_data"
 test 21 "./test_data"
 
+info="2x -n"
+test 22 "-n -n"
 
-printf "\n"
+info="2x -i"
+test 23 "-i aaa -i bbb"
+
+info="Snadny vyraz -i 1"
+test 24 "-i 1 ./test_data/nas_mnogo"
+
+info="Snadny vyraz -i 1$"
+test 25 "-i 1$ ./test_data/nas_mnogo"
+
+info="Snadny vyraz -i ^9"
+test 26 "-i ^9 ./test_data/nas_mnogo"
+
+info="Slozeny vyraz -i (^9|1$)"
+test 27 "-i (^9|1$) ./test_data/nas_mnogo"
+
+info="Slozeny vyraz -i (^9|[16]$)"
+test 28 "-i (^9|[16]$) ./test_data/nas_mnogo"
+
+info="Bez vyrazu za -i"
+test 29 "-i"
+
+info="Nefunguji odkazy (jen jsem zrusil cestu), ocekavam ze skript zjisti ze selhal"
+OLD="$PATH"
+PATH=""
+test 30 "./test_data/one"
+PATH="$OLD"
+
+# 31 test ---------------------------
+info="Skript prekopirovan do ./test_data/nas_mnogo a spusten bez parametru
+	nekolik varovani: 
+		1. doufam ze mate skript do 10k
+		2. ze je to spustitelny soubor
+	Jinak si vysledek upravte. .)"
+cp "$file" ./test_data/nas_mnogo/
+cd ./test_data/nas_mnogo/
+
+
+initTest "31"
+testError="./../../$testError"
+testOut="./../../$testOut"
+testMy="./../../$testMy"
+
+zbytek=$(tail -n +2 $testOut)
+printf %s\\n%s\\n "Root directory: $PWD" "$zbytek" > $testOut
+
+`${spoustec} ./dirgraph > ${testMy} 2> ${testError}`
+isOk $testNumber $? $testError   
+printf \\t%s\\n\\n "${TEXT_BLUE}$info${TEXT_RESET}"
+rm dirgraph
+cd ./../..
+# ---------------------------
+
+END=$(date +%s)
+printf "Test trval vterin: $(( $END - $START ))\n"
