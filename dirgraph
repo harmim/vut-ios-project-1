@@ -100,6 +100,10 @@ fi
 
 while read file
 do
+	if [ ! -r "$file" ]; then
+		continue
+	fi
+
 	ignore=0
 	if [ "$REGEXP" ]; then
 		# ignore files and all files in subdirectories specified in REGEXP
