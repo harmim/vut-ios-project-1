@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 
+
 ########## set debug options ##########
 
 set -u # undefined variables error
 
 #######################################
+
 
 ########## inicialize ##########
 
@@ -14,31 +16,37 @@ IFS=' '
 USAGE_STRING=$(printf "usage:\n\t$0 [-i FILE_ERE] [-n] [DIR]")
 NORMALIZATION=0
 REGEXP=''
+# current directory
 DIR=$(pwd)
+# number of directories
 ND=0
+# number of files
 NF=0
 
+# file size histogram
 declare -A FSH
-FSH["<100B"]=0
-FSH["<1KiB"]=0
-FSH["<10KiB"]=0
-FSH["<100KiB"]=0
-FSH["<1MiB"]=0
-FSH["<10MiB"]=0
-FSH["<100MiB"]=0
-FSH["<1GiB"]=0
-FSH[">=1GiB"]=0
+FSH['<100B']=0
+FSH['<1KiB']=0
+FSH['<10KiB']=0
+FSH['<100KiB']=0
+FSH['<1MiB']=0
+FSH['<10MiB']=0
+FSH['<100MiB']=0
+FSH['<1GiB']=0
+FSH['>=1GiB']=0
 
+# file type histogram
 declare -A FTH
 
 ################################
+
 
 ########## process arguments ##########
 
 function usage_error
 {
 	echo "$USAGE_STRING" >&2
-	exit 1;
+	exit 1
 }
 
 while getopts i:n option
@@ -72,7 +80,8 @@ fi
 
 ######################################
 
-########## error checks ##########
+
+########## errors check ##########
 
 # check if FILE_ERE cover root dir
 if [ "$REGEXP" ]; then
@@ -85,51 +94,61 @@ fi
 
 # check if direcotry exists
 if [ ! -d "$DIR" ]; then
-	echo "$0: Given directory: $DIR does not exists." >&2
+	echo "$0: Given directory: '$DIR' does not exists." >&2
 	exit 1
 fi
 
 ###################################
 
+
 ########## process files ##########
 
+# prepare variables for REGEXP ignore processing
 if [ "$REGEXP" ]; then
 	dir_length_replace="${#DIR}"
 	(( dir_length_replace++ ))
 fi
 
+# iterate over all files found by find utility
 while read file
 do
+	# if file is not readable then skip it
 	if [ ! -r "$file" ]; then
 		continue
 	fi
 
-	ignore=0
+	# ignore files and all files in subdirectories specified in REGEXP
 	if [ "$REGEXP" ]; then
-		# ignore files and all files in subdirectories specified in REGEXP
-		relative_file_name=$(printf "$file" | cut -c $dir_length_replace-)
+		ignore=0
+		relative_file_name=$(printf "$file" | cut -c ${dir_length_replace}-)
+
 		if [ "$file" != "$relative_file_name" ]; then
 			IFS='/'
 			for part in $relative_file_name
 			do
 				IFS=' '
 				if printf "$part" | grep -qE "$REGEXP"; then
-					ignore=1			
+					ignore=1
+					break
 				fi
 			done
 			IFS=' '
 
-			if [ "$ignore" -eq 1 ]; then
+			if [ $ignore -eq 1 ]; then
 				continue
 			fi
 		fi
 	fi
 
+	# process files
 	if [ -d "$file" ]; then
+		# file is directory
 		(( ND++ ))
 	elif [ -f "$file" ]; then
+		# file is normall file
 		(( NF++ ))
 
+		# get file size
 		size=$(wc -c < "$file" | xargs)
 		if [ "$size" -lt 100 ]; then
 			(( FSH["<100B"]++ ))
@@ -150,10 +169,12 @@ do
 		elif [ "$size" -ge 1073741824 ]; then
 			(( FSH[">=1GiB"]++ ))
 		fi
-		
+
+		# get file type
 		file_type=$(file -b "$file")
 		file_type_chars=${#file_type}
 
+		# edit file type length
 		if [ "$file_type_chars" -gt 40 ]; then
 			file_type=$(printf "$file_type" | head -n 1 | cut -c -40)
 			file_type=$(printf '%s...' "$file_type")
@@ -164,23 +185,33 @@ do
 			FTH["$file_type"]=1
 		fi
 	fi
-done <<< $(find "$DIR" -type f -or -type d)
+done <<< $(find "$DIR" -type f -or -type d) # find all normall files and directories
 
 ###################################
 
+
+########## normalization ##########
+
+# normalization($1 $2 $3) - normalize histogram
+# arg $1 - name of array to normalize
+# arg $2 - maximum line length prefix 
+# arg $3 - minimum number of lines 
 function normalization
 {
+	# get length of line
 	line_length=79
 	if [ -t 1 ]; then
 		line_length=$(tput cols)
 		(( line_length-- ))
 	fi
 
+	# get maximum number of hashes fit to one line
 	max_hashes=$(( line_length - $2))
 	if [ $max_hashes -lt $3 ]; then
 		max_hashes=$3
 	fi
 
+	# get maximum count of values in any line
 	max_count=0
 	values=$(eval echo \${$1[*]})
 	for c in $values
@@ -190,15 +221,16 @@ function normalization
 		fi
 	done
 
+	# normalize histogram if it is necessary
 	used_line_length=$(( max_count + $2 ))
 	if [ $used_line_length -gt $line_length ]; then
-		if [ ! $max_count -eq 0 ]; then
+		if [ $max_count -ne 0 ]; then
 			IFS=$'\n'
 			keys=$(eval echo \"\${!$1[*]}\")
 			for type in $keys
 			do
 				IFS=' '
-				eval $1["$type"]=$(( $1["$type"] * 100 / max_count * max_hashes / 100 ))
+				eval $1["$type"]=$(( $1["$type"] * 10000 / max_count * max_hashes / 10000 ))
 			done
 			IFS=' '
 		fi
@@ -210,8 +242,13 @@ if [ $NORMALIZATION -eq 1 ]; then
 	normalization 'FTH' 47 10
 fi
 
+##################################
+
+
 ########## output ##########
 
+# print_hashes($1) - print given number of hashes
+# arg $1 - number of hashes to print
 function print_hashes
 {
 	if [ "$1" -ne 0 ]; then
@@ -220,8 +257,11 @@ function print_hashes
 	printf '\n'
 }
 
+# print_FTH($1) - print file type histogram
+# arg $1 - limit of file types
 function print_FTH
 {
+	# sort file types desc
 	sorted=$(
 		for file_type in "${!FTH[@]}"
 		do
@@ -229,10 +269,12 @@ function print_FTH
 		done | sort -k 1,1 -n -r -t ' '
 	)
 
+	# iterate over sorted file types
 	i=0
 	while read -r line
 	do
-		if [ "$i" -ge $1 ]; then
+		# limit of file types was reached
+		if [ $i -ge $1 ]; then
 			break
 		fi
 
@@ -252,15 +294,15 @@ echo "Directories: $ND"
 echo "All files: $NF"
 
 echo "File size histogram:"
-printf "  <100 B  : " ; print_hashes "${FSH[<100B]}"
-printf "  <1 KiB  : " ; print_hashes "${FSH[<1KiB]}"
-printf "  <10 KiB : " ; print_hashes "${FSH[<10KiB]}"
-printf "  <100 KiB: " ; print_hashes "${FSH[<100KiB]}"
-printf "  <1 MiB  : " ; print_hashes "${FSH[<1MiB]}"
-printf "  <10 MiB : " ; print_hashes "${FSH[<10MiB]}"
-printf "  <100 MiB: " ; print_hashes "${FSH[<100MiB]}"
-printf "  <1 GiB  : " ; print_hashes "${FSH[<1GiB]}"
-printf "  >=1 GiB : " ; print_hashes "${FSH[>=1GiB]}"
+printf "  <100 B  : " ; print_hashes "${FSH['<100B']}"
+printf "  <1 KiB  : " ; print_hashes "${FSH['<1KiB']}"
+printf "  <10 KiB : " ; print_hashes "${FSH['<10KiB']}"
+printf "  <100 KiB: " ; print_hashes "${FSH['<100KiB']}"
+printf "  <1 MiB  : " ; print_hashes "${FSH['<1MiB']}"
+printf "  <10 MiB : " ; print_hashes "${FSH['<10MiB']}"
+printf "  <100 MiB: " ; print_hashes "${FSH['<100MiB']}"
+printf "  <1 GiB  : " ; print_hashes "${FSH['<1GiB']}"
+printf "  >=1 GiB : " ; print_hashes "${FSH['>=1GiB']}"
 
 echo "File type histogram:"
 print_FTH 10
