@@ -194,8 +194,8 @@ done <<< $(find "$DIR" -type f -or -type d) # find all normall files and directo
 
 # normalization($1 $2 $3) - normalize histogram
 # arg $1 - name of array to normalize
-# arg $2 - maximum line length prefix 
-# arg $3 - minimum number of lines 
+# arg $2 - maximum line length prefix
+# arg $3 - minimum number of lines
 function normalization
 {
 	# get length of line
@@ -282,7 +282,7 @@ function print_FTH
 
 		value=$(printf "$line" | sed 's/\(^.*\)~.*/\1/')
 		file_type=$(printf "$line" | sed 's/^.*~\(.*\)/\1/')
-		
+
 		if [ "$value" ]; then
 			printf '  %-43s: ' "$file_type"; print_hashes "$value"
 		fi
