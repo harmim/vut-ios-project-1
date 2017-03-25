@@ -230,7 +230,7 @@ function normalization
 			for type in $keys
 			do
 				IFS=' '
-				eval $1["$type"]=$(( $1["$type"] * 10000 / max_count * max_hashes / 10000 ))
+				eval $1["$type"]=$(( $1["$type"] * max_hashes / max_count ))
 			done
 			IFS=' '
 		fi
