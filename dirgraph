@@ -185,7 +185,7 @@ do
 			FTH["$file_type"]=1
 		fi
 	fi
-done <<< $(find "$DIR" -type f -or -type d) # find all normall files and directories
+done <<< $(find "$DIR" -type f -or -type d 2> /dev/null) # find all normall files and directories
 
 ###################################
 
